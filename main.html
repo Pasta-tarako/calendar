@@ -1,0 +1,1649 @@
+```html
+<!DOCTYPE html>
+<html lang="ja" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>12/4 期末試験 学習スケジュール管理</title>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Noto Sans JP"', 'sans-serif'],
+            mono: ['"Inter"', 'monospace'],
+          },
+          boxShadow: {
+            'soft': '0 2px 12px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03)',
+            'soft-dark': '0 4px 20px -2px rgba(0, 0, 0, 0.35)',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* カスタムスクロールバー非表示（横スクロール日付バー用） */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* iPadでのタップ遅延防止と心地よいフィードバック */
+    button, label, input, select, textarea {
+      touch-action: manipulation;
+    }
+    /* チェックボックスのスムーズなアニメーション */
+    .task-checkbox:checked + .task-content .task-title {
+      text-decoration: line-through;
+      opacity: 0.55;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      70% { transform: scale(1.05); opacity: 0; }
+      100% { transform: scale(0.95); opacity: 0; }
+    }
+    .timer-active-ring {
+      animation: pulse-ring 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
+
+  <!-- =====================================================================
+       上部スティッキーヘッダー（カウントダウン・画面切替・日付ナビゲーション）
+  ====================================================================== -->
+  <header class="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- 上段：タイトル・カウントダウン・モード切替 -->
+      <div class="py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center shadow-sm shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">期末試験 学習ダッシュボード</h1>
+              <span id="countdown-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800/80">
+                <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                <span id="countdown-text">12/4(金) 期末試験開始まで あと14日</span>
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">全10教科 14日間完成スケジュール（11/20〜12/3）</p>
+          </div>
+        </div>
+
+        <!-- 右側コントロール：ビュー切替タブ & ダークモード -->
+        <div class="flex items-center gap-2">
+          <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+            <button id="tab-daily" onclick="switchView('daily')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">
+              今日のスケジュール
+            </button>
+            <button id="tab-overview" onclick="switchView('overview')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
+              14日間全体表
+            </button>
+          </div>
+
+          <button id="theme-toggle" onclick="toggleTheme()" aria-label="ダークモード切替" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/70 dark:border-slate-700 transition-colors">
+            <!-- Sun Icon (shown in dark mode) -->
+            <svg id="icon-sun" class="w-5 h-5 hidden dark:block text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <!-- Moon Icon (shown in light mode) -->
+            <svg id="icon-moon" class="w-5 h-5 block dark:hidden text-slate-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 下段：日付ナビゲーションバー（dailyビュー時に表示） -->
+      <div id="date-nav-bar" class="pb-3 flex items-center gap-2">
+        <!-- 前日・今日・翌日クイックボタン -->
+        <div class="flex items-center gap-1 shrink-0">
+          <button onclick="navigateDay(-1)" id="btn-prev-day" class="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-40 transition-colors" title="前日">
+            ◀ 前日
+          </button>
+          <button onclick="jumpToToday()" class="px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 text-xs font-bold text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 transition-colors">
+            今日
+          </button>
+          <button onclick="navigateDay(1)" id="btn-next-day" class="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-40 transition-colors" title="翌日">
+            翌日 ▶
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-800 shrink-0"></div>
+
+        <!-- 横スクロール可能な14日間日付タブ -->
+        <div id="date-tabs-container" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1">
+          <!-- JSで動的生成 -->
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       タイマー終了通知バナー（alert()の代替）
+  ====================================================================== -->
+  <div id="timer-toast" class="fixed bottom-5 right-5 left-5 sm:left-auto sm:w-96 z-50 transform translate-y-24 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-slate-900 dark:bg-slate-800 text-white rounded-2xl p-4 shadow-2xl border border-slate-700 flex items-start gap-3.5">
+      <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <div class="flex-1">
+        <h4 id="timer-toast-title" class="font-bold text-sm text-white">タイマー終了！</h4>
+        <p id="timer-toast-desc" class="text-xs text-slate-300 mt-1 leading-relaxed">時間になりました。次のステップへ進みましょう。</p>
+      </div>
+      <button onclick="hideTimerToast()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       メインコンテンツエリア
+  ====================================================================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- -------------------------------------------------------------------
+         VIEW 1: 今日のスケジュール（iPad 2カラムダッシュボード）
+    -------------------------------------------------------------------- -->
+    <div id="view-daily" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- 左カラム（7〜8列分）：選択日のヘッダーカード + タスクリスト + メモ・追加タスク -->
+      <div class="lg:col-span-7 xl:col-span-8 space-y-6">
+
+        <!-- 選択中の日のヘッダーカード -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <h2 id="day-title" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                  11/20（金）
+                </h2>
+                <span id="day-today-pill" class="hidden px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white">
+                  TODAY
+                </span>
+                <span id="day-tag-badge" class="px-3 py-1 rounded-full text-xs sm:text-sm font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80">
+                  スタート日
+                </span>
+              </div>
+              <div class="mt-2.5 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>目標勉強時間：</span>
+                <strong id="day-target-hours" class="font-bold text-slate-900 dark:text-white">2h〜4h</strong>
+              </div>
+            </div>
+
+            <!-- 達成率リング/数値 -->
+            <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/70 px-4 py-2.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70">
+              <div class="text-right">
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">今日の達成率</div>
+                <div class="flex items-baseline justify-end gap-1">
+                  <span id="day-progress-percent" class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">0%</span>
+                  <span id="day-progress-count" class="text-xs font-medium text-slate-500 dark:text-slate-400">(0/4)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- プログレスバー -->
+          <div class="mt-4 w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div id="day-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </section>
+
+        <!-- セクション1：机に向かうメイン学習 -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">机に向かうメイン学習</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">演習・課題・ノートの精読（手を動かして解く科目）</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="main-tasks-list" class="space-y-2.5">
+            <!-- JSで動的生成 -->
+          </div>
+        </section>
+
+        <!-- セクション2：スキマ時間ルーティン -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">スキマ時間ルーティン（毎日20〜30分）</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">通学中・休み時間・寝る前にGemini Notebookや漢字を進める</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="gap-tasks-list" class="space-y-2.5">
+            <!-- JSで動的生成 -->
+          </div>
+        </section>
+
+        <!-- セクション3：今日の追加タスク & 自由メモ -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800 space-y-5">
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              タスクの追加・今日のメモ
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">幾何の×印問題番号や、11/27発表後の時間割メモなどを自由に保存できます</p>
+          </div>
+
+          <!-- カスタムタスク追加フォーム -->
+          <form onsubmit="handleAddCustomTask(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+            <select id="custom-task-section" class="sm:col-span-3 px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="main">メイン学習</option>
+              <option value="gap">スキマ時間</option>
+            </select>
+            <select id="custom-task-subject" class="sm:col-span-3 px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="幾何">幾何</option>
+              <option value="代数">代数</option>
+              <option value="英語Ⅰ・Ⅱ">英語Ⅰ・Ⅱ</option>
+              <option value="英語Ⅰ">英語Ⅰ</option>
+              <option value="英語Ⅱ">英語Ⅱ</option>
+              <option value="古文">古文</option>
+              <option value="物理">物理</option>
+              <option value="現代文">現代文</option>
+              <option value="地理">地理</option>
+              <option value="日本史">日本史</option>
+              <option value="地学">地学</option>
+              <option value="試験対策">その他・調整</option>
+            </select>
+            <input id="custom-task-input" type="text" placeholder="例：問題集 p.34 #5, #8 の×印解き直し" class="sm:col-span-4 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button type="submit" class="sm:col-span-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs sm:text-sm font-bold transition-all shadow-sm">
+              追加
+            </button>
+          </form>
+
+          <!-- 自由記述メモ欄 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label for="daily-memo" class="text-xs font-bold text-slate-600 dark:text-slate-300">今日の振り返り・時間割メモ（自動保存）</label>
+              <span id="memo-saved-indicator" class="text-xs text-emerald-600 dark:text-emerald-400 opacity-0 transition-opacity duration-300">保存しました ✓</span>
+            </div>
+            <textarea id="daily-memo" rows="3" oninput="handleMemoInput()" placeholder="例：幾何の接弦定理は「接点を通る三角形」を先に赤ペンでなぞると見つけやすい。&#10;12/4(金)の1限は〇〇、2限は〇〇..." class="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition-colors"></textarea>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右カラム（5〜4列分）：学習タイマー + 幾何カンペ＆3つの鉄則 -->
+      <aside class="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-32">
+
+        <!-- サポートツール 1：学習カウントダウンタイマー -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <span class="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">学習タイマー</h3>
+                <p id="timer-mode-label" class="text-xs text-slate-500 dark:text-slate-400">プリセットを選んでスタート</p>
+              </div>
+            </div>
+            <button onclick="playNotificationChime()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="終了音をテスト">
+              🔔 音テスト
+            </button>
+          </div>
+
+          <!-- タイマーデジタル表示 -->
+          <div class="relative py-5 px-4 rounded-2xl bg-slate-900 dark:bg-slate-950 text-white text-center border border-slate-800 overflow-hidden">
+            <div id="timer-pulse-bg" class="hidden absolute inset-0 bg-indigo-500/10 timer-active-ring pointer-events-none"></div>
+            <div id="timer-display" class="text-5xl sm:text-6xl font-extrabold font-mono tracking-wider tabular-nums">
+              03:00
+            </div>
+            <!-- タイマー進捗バー -->
+            <div class="mt-4 w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div id="timer-progress-bar" class="h-full bg-rose-500 transition-all duration-300" style="width: 100%"></div>
+            </div>
+          </div>
+
+          <!-- 3つのプリセットボタン -->
+          <div class="grid grid-cols-3 gap-2 mt-4">
+            <button onclick="selectTimerPreset(3, '3分（幾何・思考リミット）')" id="preset-3" class="preset-btn flex flex-col items-center justify-center p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 transition-all">
+              <span class="text-base font-extrabold">3分</span>
+              <span class="text-[11px] font-semibold mt-0.5 text-center leading-tight">幾何思考リミット</span>
+            </button>
+            <button onclick="selectTimerPreset(30, '30分（毎日幾何タッチ）')" id="preset-30" class="preset-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:border-indigo-400 transition-all">
+              <span class="text-base font-extrabold">30分</span>
+              <span class="text-[11px] font-semibold mt-0.5 text-center leading-tight">毎日幾何タッチ</span>
+            </button>
+            <button onclick="selectTimerPreset(25, '25分（ポモドーロ集中）')" id="preset-25" class="preset-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:border-indigo-400 transition-all">
+              <span class="text-base font-extrabold">25分</span>
+              <span class="text-[11px] font-semibold mt-0.5 text-center leading-tight">ポモドーロ集中</span>
+            </button>
+          </div>
+
+          <!-- スタート / 一時停止 / リセット -->
+          <div class="grid grid-cols-2 gap-2.5 mt-3">
+            <button id="timer-start-btn" onclick="toggleTimer()" class="py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+              <svg id="timer-play-icon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+              <span id="timer-start-text">スタート</span>
+            </button>
+            <button onclick="resetTimer()" class="py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98] text-slate-700 dark:text-slate-200 font-bold text-sm border border-slate-200 dark:border-slate-700 transition-all">
+              リセット
+            </button>
+          </div>
+        </section>
+
+        <!-- サポートツール 2：幾何（円周角・接弦定理）5つのチェックリスト＆3つの鉄則カンペ -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+          <!-- カードヘッダー（折りたたみボタン付き） -->
+          <button onclick="toggleCheatSheet()" class="w-full p-5 flex items-center justify-between text-left hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center font-extrabold text-sm">
+                ∠
+              </span>
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">幾何カンペ＆3つの鉄則</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">円周角・接弦定理の見る順番</p>
+              </div>
+            </div>
+            <span id="cheatsheet-chevron" class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 transition-transform duration-200">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </button>
+
+          <!-- カンペ本体 -->
+          <div id="cheatsheet-body" class="px-5 pb-5 space-y-5 border-t border-slate-100 dark:border-slate-800 pt-4">
+            <!-- 5つのチェックリスト（図解SVG付き） -->
+            <div>
+              <div class="text-xs font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2.5">
+                図を見たら上から順に探す5つの視点
+              </div>
+              <ul class="space-y-2.5">
+                <!-- ① 直径90° -->
+                <li class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                  <svg class="w-11 h-11 shrink-0 text-slate-700 dark:text-slate-200" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="19" stroke="currentColor" stroke-width="1.8"/>
+                    <line x1="5" y1="24" x2="43" y2="24" stroke="#e11d48" stroke-width="2"/>
+                    <polyline points="5,24 28,6 43,24" stroke="currentColor" stroke-width="1.6"/>
+                    <polyline points="24.5,9 27.5,12.5 31,9.5" stroke="#e11d48" stroke-width="1.8"/>
+                  </svg>
+                  <div class="text-xs leading-snug">
+                    <span class="font-bold text-slate-900 dark:text-white block">①「直径」があったら即 90°</span>
+                    <span class="text-slate-600 dark:text-slate-300">直径に対する円周角に直角マークを書き込む</span>
+                  </div>
+                </li>
+
+                <!-- ② 内接する四角形 -->
+                <li class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                  <svg class="w-11 h-11 shrink-0 text-slate-700 dark:text-slate-200" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="19" stroke="currentColor" stroke-width="1.8"/>
+                    <polygon points="14,9 36,11 39,33 11,34" stroke="currentColor" stroke-width="1.7" fill="none"/>
+                    <circle cx="14" cy="9" r="2.2" fill="#e11d48"/>
+                    <circle cx="36" cy="11" r="2.2" fill="#2563eb"/>
+                    <circle cx="39" cy="33" r="2.2" fill="#e11d48"/>
+                    <circle cx="11" cy="34" r="2.2" fill="#2563eb"/>
+                  </svg>
+                  <div class="text-xs leading-snug">
+                    <span class="font-bold text-slate-900 dark:text-white block">② 円周上に4点 →「内接する四角形」</span>
+                    <span class="text-slate-600 dark:text-slate-300">向かい合う角の和＝180°／外角＝向かいの内角</span>
+                  </div>
+                </li>
+
+                <!-- ③ 接弦定理 -->
+                <li class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                  <svg class="w-11 h-11 shrink-0 text-slate-700 dark:text-slate-200" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="22" r="17" stroke="currentColor" stroke-width="1.8"/>
+                    <line x1="4" y1="39" x2="44" y2="39" stroke="#e11d48" stroke-width="2"/>
+                    <polygon points="24,39 11,14 38,16" stroke="currentColor" stroke-width="1.6" fill="none"/>
+                    <path d="M29,39 A6,6 0 0,0 27.5,34" stroke="#e11d48" stroke-width="2"/>
+                    <path d="M15.5,14.5 A6,6 0 0,1 13.5,19" stroke="#e11d48" stroke-width="2"/>
+                  </svg>
+                  <div class="text-xs leading-snug">
+                    <span class="font-bold text-slate-900 dark:text-white block">③「接線」→ 接弦定理の三角形</span>
+                    <span class="text-slate-600 dark:text-slate-300">接線と弦の間の角 ＝ その弦の向かいの円周角</span>
+                  </div>
+                </li>
+
+                <!-- ④ 中心Oと結ぶ -->
+                <li class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                  <svg class="w-11 h-11 shrink-0 text-slate-700 dark:text-slate-200" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="19" stroke="currentColor" stroke-width="1.8"/>
+                    <circle cx="24" cy="24" r="2" fill="currentColor"/>
+                    <polygon points="24,24 10,36 38,36" stroke="currentColor" stroke-width="1.7" fill="none"/>
+                    <line x1="15" y1="28" x2="19" y2="32" stroke="#e11d48" stroke-width="1.8"/>
+                    <line x1="33" y1="28" x2="29" y2="32" stroke="#e11d48" stroke-width="1.8"/>
+                  </svg>
+                  <div class="text-xs leading-snug">
+                    <span class="font-bold text-slate-900 dark:text-white block">④ 中心Oと結ぶ →「二等辺三角形」</span>
+                    <span class="text-slate-600 dark:text-slate-300">半径はすべて等しいので底角が等しくなる</span>
+                  </div>
+                </li>
+
+                <!-- ⑤ 辺の長さ -->
+                <li class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                  <svg class="w-11 h-11 shrink-0 text-slate-700 dark:text-slate-200" viewBox="0 0 48 48" fill="none">
+                    <circle cx="24" cy="24" r="19" stroke="currentColor" stroke-width="1.8"/>
+                    <line x1="11" y1="12" x2="36" y2="36" stroke="#e11d48" stroke-width="1.8"/>
+                    <line x1="37" y1="12" x2="12" y2="36" stroke="#2563eb" stroke-width="1.8"/>
+                    <circle cx="24" cy="24" r="2.2" fill="currentColor"/>
+                  </svg>
+                  <div class="text-xs leading-snug">
+                    <span class="font-bold text-slate-900 dark:text-white block">⑤ 辺の長さ →「方べきの定理・相似」</span>
+                    <span class="text-slate-600 dark:text-slate-300">バッテン弦・円外の2直線を見たら長さの積</span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- 3つの鉄則 -->
+            <div class="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60">
+              <div class="text-xs font-extrabold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                スケジュール完遂の3つの鉄則
+              </div>
+              <ol class="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 list-decimal list-inside leading-relaxed">
+                <li><strong>幾何は3分ルール＋毎日30分タッチ：</strong>3分悩んだら即解説＆×印。11/26以降は毎日最初の30分で解き直す。</li>
+                <li><strong>11/23(月・祝)までに英語課題100%完了：</strong>お茶会前後で終わらせ、平日は問題集の周回に集中する。</li>
+                <li><strong>暗記4教科は机に座らない：</strong>漢字とNotebook（地理・日本史・地学）はスキマ時間だけで回す。</li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+    </div>
+
+    <!-- -------------------------------------------------------------------
+         VIEW 2: 14日間全体表（一覧ダッシュボード）
+    -------------------------------------------------------------------- -->
+    <div id="view-overview" class="hidden space-y-6">
+      <!-- 全体進捗サマリーカード -->
+      <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">14日間 全体スケジュール一覧（11/20〜12/3）</h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">各日程をタップすると、その日の詳細チェックリスト画面へ移動します。</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <div class="text-xs font-medium text-slate-500 dark:text-slate-400">14日間トータル達成率</div>
+              <div class="flex items-baseline justify-end gap-1.5">
+                <span id="total-progress-percent" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">0%</span>
+                <span id="total-progress-count" class="text-xs font-semibold text-slate-500 dark:text-slate-400">(0/0 タスク)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4 w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div id="total-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </section>
+
+      <!-- 14日間一覧テーブル（レスポンシブ） -->
+      <section class="bg-white dark:bg-slate-900 rounded-2xl shadow-soft dark:shadow-soft-dark border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">
+                <th class="py-3.5 px-4 whitespace-nowrap">日付（曜日）</th>
+                <th class="py-3.5 px-4 whitespace-nowrap">目安時間</th>
+                <th class="py-3.5 px-4 min-w-[280px]">机に向かうメイン学習</th>
+                <th class="py-3.5 px-4 min-w-[220px]">スキマ時間ルーティン</th>
+                <th class="py-3.5 px-4 whitespace-nowrap text-right">進捗</th>
+              </tr>
+            </thead>
+            <tbody id="overview-table-body" class="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
+              <!-- JSで動的生成 -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 進捗リセット領域（インライン確認式・confirm()不使用） -->
+      <div class="flex justify-end">
+        <div id="reset-progress-box" class="inline-flex items-center gap-2">
+          <button onclick="showResetConfirm()" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+            すべてのチェック状態を初期化...
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =====================================================================
+       JavaScript ロジック
+  ====================================================================== -->
+  <script>
+    /**
+     * 14日間の完全スケジュールデータ（11/20〜12/3）
+     */
+    const SCHEDULE_DATA = [
+      {
+        dateKey: '11/20',
+        month: 11,
+        day: 20,
+        weekday: '金',
+        tag: 'スタート日',
+        tagStyle: 'indigo',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1120-m1', badge: '', subject: '英語Ⅰ・Ⅱ', text: '課題の全体量を把握し、1/6進める' },
+          { id: '1120-m2', badge: '', subject: '代数', text: '問題集1周目・範囲の1/4' }
+        ],
+        gapTasks: [
+          { id: '1120-g1', subject: '現代文', text: '漢字' },
+          { id: '1120-g2', subject: '地理', text: 'Notebookに資料集約・全体把握' }
+        ]
+      },
+      {
+        dateKey: '11/21',
+        month: 11,
+        day: 21,
+        weekday: '土',
+        tag: '3連休①',
+        tagStyle: 'amber',
+        targetHours: '最大2h',
+        mainTasks: [
+          { id: '1121-m1', badge: '', subject: '英語Ⅰ・Ⅱ', text: '90分：課題の2/6まで進める' },
+          { id: '1121-m2', badge: '', subject: '古文', text: '30分：助動詞の「活用表」だけを集中暗記' }
+        ],
+        gapTasks: [
+          { id: '1121-g1', subject: '現代文', text: '漢字' },
+          { id: '1121-g2', subject: '日本史', text: 'Notebookの要約・音声を聞く' }
+        ]
+      },
+      {
+        dateKey: '11/22',
+        month: 11,
+        day: 22,
+        weekday: '日',
+        tag: '3連休② ★最大の山場',
+        tagStyle: 'rose',
+        targetHours: '終日フリー 8〜9h',
+        mainTasks: [
+          { id: '1122-m1', badge: '【午前】', subject: '英語Ⅰ・Ⅱ', text: '課題を5/6まで進める' },
+          { id: '1122-m2', badge: '【午前】', subject: '幾何', text: '問題集1周目 1/4〜2/4' },
+          { id: '1122-m3', badge: '【午後】', subject: '代数', text: '問題集1周目 2/4〜3/4' },
+          { id: '1122-m4', badge: '【午後】', subject: '物理', text: 'ノート見返し・前半' },
+          { id: '1122-m5', badge: '【夜】', subject: '古文', text: '助動詞の意味・接続の暗記' }
+        ],
+        gapTasks: [
+          { id: '1122-g1', subject: '現代文', text: '漢字' },
+          { id: '1122-g2', subject: '地学', text: 'Notebookで重要語句リスト作成' },
+          { id: '1122-g3', subject: '地理', text: 'Notebookで一問一答' }
+        ]
+      },
+      {
+        dateKey: '11/23',
+        month: 11,
+        day: 23,
+        weekday: '月・祝',
+        tag: '3連休③ ※お茶会あり',
+        tagStyle: 'amber',
+        targetHours: '4〜5h（お茶会前後）',
+        mainTasks: [
+          { id: '1123-m1', badge: '', subject: '英語Ⅰ・Ⅱ', text: '2h：残り1/6を終わらせ課題100%完了' },
+          { id: '1123-m2', badge: '', subject: '幾何', text: '1.5h：問題集1周目・範囲の3/4' },
+          { id: '1123-m3', badge: '', subject: '物理', text: '1h：ノート見返し・後半' }
+        ],
+        gapTasks: [
+          { id: '1123-g1', subject: '現代文', text: '漢字' },
+          { id: '1123-g2', subject: '日本史・地学', text: 'Notebookで一問一答' }
+        ]
+      },
+      {
+        dateKey: '11/24',
+        month: 11,
+        day: 24,
+        weekday: '火',
+        tag: '平日',
+        tagStyle: 'slate',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1124-m1', badge: '【必須 2h】', subject: '幾何', text: '問題集1周目完了 4/4' },
+          { id: '1124-m2', badge: '【必須 2h】', subject: '古文', text: '助動詞の識別演習' },
+          { id: '1124-m3', badge: '【追加 +2h】', subject: '英語Ⅰ・Ⅱ', text: '課題で間違えた箇所の解き直し' }
+        ],
+        gapTasks: [
+          { id: '1124-g1', subject: '現代文', text: '漢字' },
+          { id: '1124-g2', subject: '地学', text: 'Notebookで一問一答' }
+        ]
+      },
+      {
+        dateKey: '11/25',
+        month: 11,
+        day: 25,
+        weekday: '水',
+        tag: '平日',
+        tagStyle: 'slate',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1125-m1', badge: '【必須 2h】', subject: '代数', text: '問題集1周目完了 4/4' },
+          { id: '1125-m2', badge: '【必須 2h】', subject: '物理', text: 'ノート例題の解き直し' },
+          { id: '1125-m3', badge: '【追加 +2h】', subject: '幾何', text: '2周目開始：×印のみ' }
+        ],
+        gapTasks: [
+          { id: '1125-g1', subject: '現代文', text: '漢字' },
+          { id: '1125-g2', subject: '地理', text: 'Notebookで記述・理由クイズ' }
+        ]
+      },
+      {
+        dateKey: '11/26',
+        month: 11,
+        day: 26,
+        weekday: '木',
+        tag: '平日',
+        tagStyle: 'slate',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1126-m1', badge: '【必須 2h】', subject: '幾何', text: '毎日30分：×印解き直し' },
+          { id: '1126-m2', badge: '【必須 2h】', subject: '英語Ⅰ・Ⅱ', text: '課題の間違えた箇所・重要構文復習' },
+          { id: '1126-m3', badge: '【追加 +2h】', subject: '代数', text: '2周目開始：×印のみ' }
+        ],
+        gapTasks: [
+          { id: '1126-g1', subject: '現代文', text: '1週目の漢字総復習' },
+          { id: '1126-g2', subject: '日本史', text: 'Notebookで流れ・因果クイズ' }
+        ]
+      },
+      {
+        dateKey: '11/27',
+        month: 11,
+        day: 27,
+        weekday: '金',
+        tag: '※時間割発表目安',
+        tagStyle: 'purple',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1127-m1', badge: '【必須 2h】', subject: '幾何', text: '毎日30分：×印解き直し' },
+          { id: '1127-m2', badge: '【必須 2h】', subject: '代数', text: '2周目続き' },
+          { id: '1127-m3', badge: '【必須 2h】', subject: '計画調整', text: '時間割確認と後半の優先順位決定' },
+          { id: '1127-m4', badge: '【追加 +2h】', subject: '物理', text: '公式導出・苦手単元の解き直し' }
+        ],
+        gapTasks: [
+          { id: '1127-g1', subject: '現代文', text: '漢字' },
+          { id: '1127-g2', subject: '地学', text: 'Notebookで図表・計算要点' }
+        ]
+      },
+      {
+        dateKey: '11/28',
+        month: 11,
+        day: 28,
+        weekday: '土',
+        tag: '週末①',
+        tagStyle: 'emerald',
+        targetHours: '6h〜8h',
+        mainTasks: [
+          { id: '1128-m1', badge: '', subject: '幾何', text: '2周目完了：×印をすべて潰す' },
+          { id: '1128-m2', badge: '', subject: '英語Ⅰ', text: '課題の要点・文法/長文の総復習' },
+          { id: '1128-m3', badge: '', subject: '古文', text: '助動詞の総合演習・例文訳' }
+        ],
+        gapTasks: [
+          { id: '1128-g1', subject: '現代文', text: '漢字' },
+          { id: '1128-g2', subject: '地理・日本史', text: 'Notebookで小テスト' }
+        ]
+      },
+      {
+        dateKey: '11/29',
+        month: 11,
+        day: 29,
+        weekday: '日',
+        tag: '週末②',
+        tagStyle: 'emerald',
+        targetHours: '6h〜8h',
+        mainTasks: [
+          { id: '1129-m1', badge: '', subject: '幾何・代数', text: '3周目：2周目でも解けなかった問題だけ潰す' },
+          { id: '1129-m2', badge: '', subject: '英語Ⅱ', text: '課題の要点・文法/長文の総復習' },
+          { id: '1129-m3', badge: '', subject: '物理', text: 'ノート全体の最終確認' }
+        ],
+        gapTasks: [
+          { id: '1129-g1', subject: '現代文', text: '漢字' },
+          { id: '1129-g2', subject: '地学', text: 'Notebookで小テスト' }
+        ]
+      },
+      {
+        dateKey: '11/30',
+        month: 11,
+        day: 30,
+        weekday: '月',
+        tag: '※塾の日',
+        tagStyle: 'amber',
+        targetHours: '2h',
+        mainTasks: [
+          { id: '1130-m1', badge: '【必須 2h】', subject: '幾何', text: '毎日30分：×印解き直し' },
+          { id: '1130-m2', badge: '【必須 2h】', subject: '英語Ⅰ・Ⅱ', text: '暗記事項・課題要点の最終チェック' },
+          { id: '1130-m3', badge: '【必須 2h】', subject: '古文', text: '助動詞の最終チェック' }
+        ],
+        gapTasks: [
+          { id: '1130-g1', subject: '現代文', text: '漢字の総仕上げテスト' },
+          { id: '1130-g2', subject: '地理', text: '弱点単元をNotebookで確認' }
+        ]
+      },
+      {
+        dateKey: '12/1',
+        month: 12,
+        day: 1,
+        weekday: '火',
+        tag: '平日',
+        tagStyle: 'slate',
+        targetHours: '2h〜4h',
+        mainTasks: [
+          { id: '1201-m1', badge: '【必須 2h】', subject: '幾何・代数', text: '典型問題の解法パターン最終確認' },
+          { id: '1201-m2', badge: '【追加 +2h】', subject: '物理', text: '弱点最終確認' },
+          { id: '1201-m3', badge: '【追加 +2h】', subject: '日本史・地学', text: '弱点単元' }
+        ],
+        gapTasks: [
+          { id: '1201-g1', subject: '現代文', text: '間違えた漢字のみ復習' },
+          { id: '1201-g2', subject: '日本史・地学', text: 'Notebookで要点確認' }
+        ]
+      },
+      {
+        dateKey: '12/2',
+        month: 12,
+        day: 2,
+        weekday: '水',
+        tag: '調整日',
+        tagStyle: 'indigo',
+        targetHours: '4h',
+        mainTasks: [
+          { id: '1202-m1', badge: '【調整日】', subject: '試験対策', text: '試験1・2日目の科目を集中演習（時間割に合わせて暗記の最終詰め込み＆解き直し）' }
+        ],
+        gapTasks: [
+          { id: '1202-g1', subject: '暗記科目', text: '試験1・2日目の暗記科目をNotebookで総復習' }
+        ]
+      },
+      {
+        dateKey: '12/3',
+        month: 12,
+        day: 3,
+        weekday: '木',
+        tag: '試験前日',
+        tagStyle: 'rose',
+        targetHours: '4h',
+        mainTasks: [
+          { id: '1203-m1', badge: '【前日】', subject: '初日科目', text: '12/4（金）試験科目の最終確認（新しい問題には手を出さず、公式・漢字・単語の確認と早めの就寝）' }
+        ],
+        gapTasks: [
+          { id: '1203-g1', subject: '初日科目', text: 'スキマ時間もすべて12/4の科目に集中' }
+        ]
+      }
+    ];
+
+    /**
+     * 科目ごとのカラーバッジスタイル定義
+     */
+    const SUBJECT_STYLES = {
+      '幾何': 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800/80',
+      '代数': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-800/80',
+      '幾何・代数': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-800/80',
+      '英語Ⅰ・Ⅱ': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-800/80',
+      '英語Ⅰ': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-800/80',
+      '英語Ⅱ': 'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950/80 dark:text-violet-300 dark:border-violet-800/80',
+      '古文': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800/80',
+      '物理': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-800/80',
+      '現代文': 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800/80',
+      '地理': 'bg-lime-100 text-lime-800 border-lime-200 dark:bg-lime-950/80 dark:text-lime-300 dark:border-lime-800/80',
+      '日本史': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/80 dark:text-orange-300 dark:border-orange-800/80',
+      '地学': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/80 dark:text-teal-300 dark:border-teal-800/80',
+      '日本史・地学': 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-950/80 dark:text-fuchsia-300 dark:border-fuchsia-800/80',
+      '地理・日本史': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-950/80 dark:text-pink-300 dark:border-pink-800/80'
+    };
+
+    const DEFAULT_SUBJECT_STYLE = 'bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700';
+
+    /**
+     * 区分タグ（【必須 2h】【追加 +2h】等）のスタイル定義
+     */
+    function getDistinctionBadgeHTML(badge) {
+      if (!badge) return '';
+      let style = 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600';
+      if (badge.includes('必須')) {
+        style = 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800';
+      } else if (badge.includes('追加')) {
+        style = 'bg-sky-50 text-sky-700 border-sky-300 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-800';
+      } else if (badge.includes('午前') || badge.includes('午後') || badge.includes('夜')) {
+        style = 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800';
+      } else if (badge.includes('調整') || badge.includes('前日')) {
+        style = 'bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800';
+      }
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${style} shrink-0">${badge}</span>`;
+    }
+
+    /**
+     * localStorage キーとアプリケーション状態
+     */
+    const STORAGE_KEYS = {
+      CHECKED: 'exam_planner_checked_v1',
+      CUSTOM_TASKS: 'exam_planner_custom_tasks_v1',
+      MEMOS: 'exam_planner_memos_v1',
+      THEME: 'exam_planner_theme_v1'
+    };
+
+    let state = {
+      selectedIndex: 0,
+      todayIndex: -1, // 実際の日付が11/20〜12/3に該当する場合のインデックス
+      currentView: 'daily', // 'daily' | 'overview'
+      checkedMap: {},
+      customTasksMap: {}, // { '11/20': [ { id, section, subject, text } ] }
+      memosMap: {},       // { '11/20': '...' }
+      cheatSheetOpen: true
+    };
+
+    /**
+     * 初期化処理
+     */
+    function initApp() {
+      loadFromStorage();
+      initTheme();
+      initDateAndCountdown();
+      renderDateTabs();
+      renderSelectedDay();
+      renderOverviewTable();
+      updateTimerDisplay();
+    }
+
+    /**
+     * localStorage からの読み込み
+     */
+    function loadFromStorage() {
+      try {
+        const savedChecked = localStorage.getItem(STORAGE_KEYS.CHECKED);
+        if (savedChecked) state.checkedMap = JSON.parse(savedChecked);
+
+        const savedCustom = localStorage.getItem(STORAGE_KEYS.CUSTOM_TASKS);
+        if (savedCustom) state.customTasksMap = JSON.parse(savedCustom);
+
+        const savedMemos = localStorage.getItem(STORAGE_KEYS.MEMOS);
+        if (savedMemos) state.memosMap = JSON.parse(savedMemos);
+      } catch (e) {
+        console.error('Storage load error:', e);
+      }
+    }
+
+    function saveCheckedToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.CHECKED, JSON.stringify(state.checkedMap));
+      } catch (e) {
+        console.error('Storage save error:', e);
+      }
+    }
+
+    function saveCustomTasksToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_TASKS, JSON.stringify(state.customTasksMap));
+      } catch (e) {
+        console.error('Storage save error:', e);
+      }
+    }
+
+    function saveMemosToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEYS.MEMOS, JSON.stringify(state.memosMap));
+      } catch (e) {
+        console.error('Storage save error:', e);
+      }
+    }
+
+    /**
+     * ダークモード初期化・切り替え
+     */
+    function initTheme() {
+      const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem(STORAGE_KEYS.THEME, isDark ? 'dark' : 'light');
+    }
+
+    /**
+     * 現在日付の判定と12/4試験カウントダウン計算
+     */
+    function initDateAndCountdown() {
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // 12月4日をターゲットに設定（もし12/15を過ぎていたら翌年扱い）
+      let targetYear = now.getFullYear();
+      if (now.getMonth() === 11 && now.getDate() > 15) {
+        targetYear += 1;
+      }
+      const examDate = new Date(targetYear, 11, 4); // Month is 0-indexed (11 = December)
+      const diffMs = examDate - todayMidnight;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      const countdownEl = document.getElementById('countdown-text');
+      if (diffDays > 0) {
+        countdownEl.textContent = `12/4(金) 期末試験開始まで あと${diffDays}日`;
+      } else if (diffDays === 0) {
+        countdownEl.textContent = `本日 12/4(金) 期末試験開始日！`;
+      } else {
+        countdownEl.textContent = `12/4(金) 期末試験期間中！`;
+      }
+
+      // アクセス日の月日（M/D）が11/20〜12/3に該当するか検索
+      const currentMonth = now.getMonth() + 1;
+      const currentDay = now.getDate();
+      const foundIdx = SCHEDULE_DATA.findIndex(d => d.month === currentMonth && d.day === currentDay);
+
+      if (foundIdx !== -1) {
+        state.todayIndex = foundIdx;
+        state.selectedIndex = foundIdx;
+      } else {
+        state.todayIndex = -1;
+        state.selectedIndex = 0; // 範囲外の場合は11/20を初期表示
+      }
+    }
+
+    /**
+     * 指定日の全タスク（標準＋カスタム）を取得
+     */
+    function getTasksForDay(dayObj) {
+      const customList = state.customTasksMap[dayObj.dateKey] || [];
+      const customMain = customList.filter(t => t.section === 'main');
+      const customGap = customList.filter(t => t.section === 'gap');
+      return {
+        main: [...dayObj.mainTasks, ...customMain],
+        gap: [...dayObj.gapTasks, ...customGap]
+      };
+    }
+
+    /**
+     * 指定日の達成率を計算
+     */
+    function getDayProgress(dayObj) {
+      const { main, gap } = getTasksForDay(dayObj);
+      const all = [...main, ...gap];
+      const total = all.length;
+      const completed = all.filter(t => !!state.checkedMap[t.id]).length;
+      const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+      return { completed, total, percent };
+    }
+
+    /**
+     * 日付ナビゲーションタブ（11/20〜12/3）を描画
+     */
+    function renderDateTabs() {
+      const container = document.getElementById('date-tabs-container');
+      container.innerHTML = SCHEDULE_DATA.map((dayObj, idx) => {
+        const isSelected = idx === state.selectedIndex;
+        const isToday = idx === state.todayIndex;
+        const { percent } = getDayProgress(dayObj);
+        const isComplete = percent === 100;
+
+        let baseClasses = 'relative flex flex-col items-center justify-center min-w-[66px] sm:min-w-[74px] px-2.5 py-1.5 rounded-xl border text-xs transition-all shrink-0 select-none ';
+        if (isSelected) {
+          baseClasses += 'bg-indigo-600 text-white border-indigo-600 shadow-sm font-bold';
+        } else if (isToday) {
+          baseClasses += 'bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700 font-semibold';
+        } else {
+          baseClasses += 'bg-white dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800';
+        }
+
+        const todayDot = isToday
+          ? `<span class="absolute -top-1.5 px-1.5 py-0.2 rounded-full text-[9px] font-extrabold ${isSelected ? 'bg-amber-300 text-slate-900' : 'bg-indigo-600 text-white'}">今日</span>`
+          : '';
+
+        const progressIndicator = isComplete
+          ? `<span class="mt-1 w-3.5 h-1 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}"></span>`
+          : `<span class="mt-1 w-5 h-1 rounded-full ${isSelected ? 'bg-indigo-400/50' : 'bg-slate-200 dark:bg-slate-700'} overflow-hidden block"><span class="block h-full ${isSelected ? 'bg-white' : 'bg-indigo-500'}" style="width:${percent}%"></span></span>`;
+
+        return `
+          <button onclick="selectDay(${idx})" id="date-tab-${idx}" class="${baseClasses}">
+            ${todayDot}
+            <span class="tracking-tight">${dayObj.dateKey}</span>
+            <span class="text-[10px] ${isSelected ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-400'}">(${dayObj.weekday})</span>
+            ${progressIndicator}
+          </button>
+        `;
+      }).join('');
+
+      // 前日・翌日ボタンの活性制御
+      document.getElementById('btn-prev-day').disabled = state.selectedIndex <= 0;
+      document.getElementById('btn-next-day').disabled = state.selectedIndex >= SCHEDULE_DATA.length - 1;
+
+      // 選択中のタブを中央付近へ自動スクロール
+      setTimeout(() => {
+        const activeTab = document.getElementById(`date-tab-${state.selectedIndex}`);
+        if (activeTab) {
+          activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 50);
+    }
+
+    /**
+     * 日付選択・移動操作
+     */
+    function selectDay(index) {
+      if (index < 0 || index >= SCHEDULE_DATA.length) return;
+      state.selectedIndex = index;
+      renderDateTabs();
+      renderSelectedDay();
+    }
+
+    function navigateDay(delta) {
+      selectDay(state.selectedIndex + delta);
+    }
+
+    function jumpToToday() {
+      const targetIdx = state.todayIndex !== -1 ? state.todayIndex : 0;
+      selectDay(targetIdx);
+    }
+
+    /**
+     * タグスタイルの取得
+     */
+    function getTagBadgeClasses(styleKey) {
+      switch (styleKey) {
+        case 'rose':
+          return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800';
+        case 'amber':
+          return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-800';
+        case 'purple':
+          return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/80 dark:text-purple-300 dark:border-purple-800';
+        case 'emerald':
+          return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800';
+        case 'indigo':
+          return 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-800';
+        default:
+          return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+      }
+    }
+
+    /**
+     * 選択中の日のスケジュール画面を描画
+     */
+    function renderSelectedDay() {
+      const dayObj = SCHEDULE_DATA[state.selectedIndex];
+      const isToday = state.selectedIndex === state.todayIndex;
+
+      // ヘッダー情報
+      document.getElementById('day-title').textContent = `${dayObj.dateKey}（${dayObj.weekday}）`;
+      const todayPill = document.getElementById('day-today-pill');
+      if (isToday) {
+        todayPill.classList.remove('hidden');
+      } else {
+        todayPill.classList.add('hidden');
+      }
+
+      const tagBadge = document.getElementById('day-tag-badge');
+      tagBadge.textContent = dayObj.tag;
+      tagBadge.className = `px-3 py-1 rounded-full text-xs sm:text-sm font-bold border ${getTagBadgeClasses(dayObj.tagStyle)}`;
+
+      document.getElementById('day-target-hours').textContent = dayObj.targetHours;
+
+      // タスク一覧取得＆描画
+      const { main, gap } = getTasksForDay(dayObj);
+      document.getElementById('main-tasks-list').innerHTML = main.map(t => renderTaskRow(t, dayObj.dateKey)).join('');
+      document.getElementById('gap-tasks-list').innerHTML = gap.map(t => renderTaskRow(t, dayObj.dateKey)).join('');
+
+      // メモ欄の反映
+      document.getElementById('daily-memo').value = state.memosMap[dayObj.dateKey] || '';
+
+      // 達成率更新
+      updateProgressUI();
+    }
+
+    /**
+     * 個別タスク行のHTML生成（iPadでタップしやすい大きなチェックボックス）
+     */
+    function renderTaskRow(task, dateKey) {
+      const isChecked = !!state.checkedMap[task.id];
+      const subjectStyle = SUBJECT_STYLES[task.subject] || DEFAULT_SUBJECT_STYLE;
+      const distinctionHTML = getDistinctionBadgeHTML(task.badge);
+      const isCustom = task.id.startsWith('custom-');
+
+      // 幾何タスクの場合はクイック「3分タイマー」起動ボタンを添える
+      const isGeometry = task.subject.includes('幾何');
+      const quickTimerBtn = isGeometry
+        ? `<button type="button" onclick="event.stopPropagation(); quickStartGeometryTimer()" class="ml-auto px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/70 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[11px] font-bold shrink-0 transition-colors" title="3分思考リミットタイマーを開始">
+             ⏱ 3分計測
+           </button>`
+        : '';
+
+      const deleteBtn = isCustom
+        ? `<button type="button" onclick="event.stopPropagation(); deleteCustomTask('${dateKey}', '${task.id}')" class="ml-2 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 shrink-0 transition-colors" title="追加タスクを削除">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+             </svg>
+           </button>`
+        : '';
+
+      return `
+        <div class="group flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
+          isChecked
+            ? 'bg-slate-50/80 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800'
+            : 'bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 shadow-2xs'
+        }">
+          <label class="flex items-start sm:items-center gap-3.5 flex-1 cursor-pointer select-none min-h-[32px]">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleTaskCheck('${task.id}')" class="task-checkbox w-6 h-6 mt-0.5 sm:mt-0 rounded-lg border-2 border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0 transition-colors" />
+            <div class="task-content flex-1 flex flex-wrap items-center gap-2">
+              ${distinctionHTML}
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold border ${subjectStyle} shrink-0">
+                ${escapeHTML(task.subject)}
+              </span>
+              <span class="task-title text-sm sm:text-[15px] font-medium text-slate-800 dark:text-slate-100 leading-snug">
+                ${escapeHTML(task.text)}
+              </span>
+            </div>
+          </label>
+          ${quickTimerBtn}
+          ${deleteBtn}
+        </div>
+      `;
+    }
+
+    /**
+     * チェックボックス切り替え
+     */
+    function toggleTaskCheck(taskId) {
+      state.checkedMap[taskId] = !state.checkedMap[taskId];
+      saveCheckedToStorage();
+      renderSelectedDay();
+      renderDateTabs();
+      renderOverviewTable();
+    }
+
+    /**
+     * 達成率プログレスバーの更新
+     */
+    function updateProgressUI() {
+      const dayObj = SCHEDULE_DATA[state.selectedIndex];
+      const { completed, total, percent } = getDayProgress(dayObj);
+
+      document.getElementById('day-progress-percent').textContent = `${percent}%`;
+      document.getElementById('day-progress-count').textContent = `(${completed}/${total})`;
+      document.getElementById('day-progress-bar').style.width = `${percent}%`;
+    }
+
+    /**
+     * カスタムタスク追加・削除
+     */
+    function handleAddCustomTask(event) {
+      event.preventDefault();
+      const inputEl = document.getElementById('custom-task-input');
+      const sectionEl = document.getElementById('custom-task-section');
+      const subjectEl = document.getElementById('custom-task-subject');
+
+      const text = inputEl.value.trim();
+      if (!text) return;
+
+      const dayObj = SCHEDULE_DATA[state.selectedIndex];
+      if (!state.customTasksMap[dayObj.dateKey]) {
+        state.customTasksMap[dayObj.dateKey] = [];
+      }
+
+      state.customTasksMap[dayObj.dateKey].push({
+        id: `custom-${Date.now()}`,
+        section: sectionEl.value,
+        badge: '【追加メモ】',
+        subject: subjectEl.value,
+        text: text
+      });
+
+      inputEl.value = '';
+      saveCustomTasksToStorage();
+      renderSelectedDay();
+      renderDateTabs();
+      renderOverviewTable();
+    }
+
+    function deleteCustomTask(dateKey, taskId) {
+      if (!state.customTasksMap[dateKey]) return;
+      state.customTasksMap[dateKey] = state.customTasksMap[dateKey].filter(t => t.id !== taskId);
+      delete state.checkedMap[taskId];
+      saveCustomTasksToStorage();
+      saveCheckedToStorage();
+      renderSelectedDay();
+      renderDateTabs();
+      renderOverviewTable();
+    }
+
+    /**
+     * 日別自由メモの保存
+     */
+    let memoSaveTimeout = null;
+    function handleMemoInput() {
+      const dayObj = SCHEDULE_DATA[state.selectedIndex];
+      const val = document.getElementById('daily-memo').value;
+      state.memosMap[dayObj.dateKey] = val;
+      saveMemosToStorage();
+
+      const indicator = document.getElementById('memo-saved-indicator');
+      indicator.classList.remove('opacity-0');
+      clearTimeout(memoSaveTimeout);
+      memoSaveTimeout = setTimeout(() => {
+        indicator.classList.add('opacity-0');
+      }, 1500);
+    }
+
+    /**
+     * 画面切り替え（今日のスケジュール <-> 14日間全体表）
+     */
+    function switchView(viewName) {
+      state.currentView = viewName;
+      const dailyView = document.getElementById('view-daily');
+      const overviewView = document.getElementById('view-overview');
+      const dateNavBar = document.getElementById('date-nav-bar');
+
+      const tabDaily = document.getElementById('tab-daily');
+      const tabOverview = document.getElementById('tab-overview');
+
+      const activeTabClass = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+      const inactiveTabClass = 'px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white';
+
+      if (viewName === 'daily') {
+        dailyView.classList.remove('hidden');
+        overviewView.classList.add('hidden');
+        dateNavBar.classList.remove('hidden');
+        tabDaily.className = activeTabClass;
+        tabOverview.className = inactiveTabClass;
+        renderSelectedDay();
+      } else {
+        dailyView.classList.add('hidden');
+        overviewView.classList.remove('hidden');
+        dateNavBar.classList.add('hidden');
+        tabDaily.className = inactiveTabClass;
+        tabOverview.className = activeTabClass;
+        renderOverviewTable();
+      }
+    }
+
+    /**
+     * 14日間全体表の描画
+     */
+    function renderOverviewTable() {
+      let totalTasksAll = 0;
+      let totalCompletedAll = 0;
+
+      const tbody = document.getElementById('overview-table-body');
+      tbody.innerHTML = SCHEDULE_DATA.map((dayObj, idx) => {
+        const { main, gap } = getTasksForDay(dayObj);
+        const { completed, total, percent } = getDayProgress(dayObj);
+        totalTasksAll += total;
+        totalCompletedAll += completed;
+
+        const isToday = idx === state.todayIndex;
+        const rowHighlight = isToday
+          ? 'bg-indigo-50/60 dark:bg-indigo-950/30'
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50';
+
+        const mainSummary = main.map(t => {
+          const done = state.checkedMap[t.id];
+          const badgeStyle = SUBJECT_STYLES[t.subject] || DEFAULT_SUBJECT_STYLE;
+          return `
+            <div class="flex items-start gap-1.5 ${done ? 'opacity-50 line-through' : ''}">
+              <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold border ${badgeStyle} shrink-0 mt-0.5">${escapeHTML(t.subject)}</span>
+              <span class="text-slate-700 dark:text-slate-200 leading-snug">${t.badge ? `<strong class="text-[11px] text-slate-500 dark:text-slate-400">${escapeHTML(t.badge)}</strong> ` : ''}${escapeHTML(t.text)}</span>
+            </div>
+          `;
+        }).join('');
+
+        const gapSummary = gap.map(t => {
+          const done = state.checkedMap[t.id];
+          const badgeStyle = SUBJECT_STYLES[t.subject] || DEFAULT_SUBJECT_STYLE;
+          return `
+            <div class="flex items-start gap-1.5 ${done ? 'opacity-50 line-through' : ''}">
+              <span class="inline-block px-1.5 py-0.2 rounded text-[10px] font-bold border ${badgeStyle} shrink-0 mt-0.5">${escapeHTML(t.subject)}</span>
+              <span class="text-slate-600 dark:text-slate-300 leading-snug">${escapeHTML(t.text)}</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <tr onclick="jumpToDayFromOverview(${idx})" class="${rowHighlight} cursor-pointer transition-colors">
+            <td class="py-3.5 px-4 align-top whitespace-nowrap">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-slate-900 dark:text-white">${dayObj.dateKey}（${dayObj.weekday}）</span>
+                ${isToday ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white">今日</span>' : ''}
+              </div>
+              <div class="mt-1">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold border ${getTagBadgeClasses(dayObj.tagStyle)}">
+                  ${dayObj.tag}
+                </span>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 align-top whitespace-nowrap font-bold text-slate-700 dark:text-slate-200">
+              ${dayObj.targetHours}
+            </td>
+            <td class="py-3.5 px-4 align-top space-y-1.5">
+              ${mainSummary}
+            </td>
+            <td class="py-3.5 px-4 align-top space-y-1.5">
+              ${gapSummary}
+            </td>
+            <td class="py-3.5 px-4 align-top whitespace-nowrap text-right">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold ${
+                percent === 100
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+              }">
+                ${percent}% (${completed}/${total})
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      const totalPercent = totalTasksAll === 0 ? 0 : Math.round((totalCompletedAll / totalTasksAll) * 100);
+      document.getElementById('total-progress-percent').textContent = `${totalPercent}%`;
+      document.getElementById('total-progress-count').textContent = `(${totalCompletedAll}/${totalTasksAll} タスク)`;
+      document.getElementById('total-progress-bar').style.width = `${totalPercent}%`;
+    }
+
+    function jumpToDayFromOverview(idx) {
+      state.selectedIndex = idx;
+      switchView('daily');
+      renderDateTabs();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    /**
+     * 進捗リセット確認UI（confirm()不使用）
+     */
+    function showResetConfirm() {
+      const box = document.getElementById('reset-progress-box');
+      box.innerHTML = `
+        <span class="text-xs text-rose-600 dark:text-rose-400 font-semibold">本当にすべてのチェックを外しますか？</span>
+        <button onclick="executeResetProgress()" class="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-700">はい、初期化</button>
+        <button onclick="cancelResetConfirm()" class="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold">キャンセル</button>
+      `;
+    }
+
+    function cancelResetConfirm() {
+      const box = document.getElementById('reset-progress-box');
+      box.innerHTML = `
+        <button onclick="showResetConfirm()" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+          すべてのチェック状態を初期化...
+        </button>
+      `;
+    }
+
+    function executeResetProgress() {
+      state.checkedMap = {};
+      saveCheckedToStorage();
+      cancelResetConfirm();
+      renderOverviewTable();
+      renderDateTabs();
+    }
+
+    /**
+     * 幾何カンペカードの折りたたみ制御
+     */
+    function toggleCheatSheet() {
+      state.cheatSheetOpen = !state.cheatSheetOpen;
+      const body = document.getElementById('cheatsheet-body');
+      const chevron = document.getElementById('cheatsheet-chevron');
+      if (state.cheatSheetOpen) {
+        body.classList.remove('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+      } else {
+        body.classList.add('hidden');
+        chevron.style.transform = 'rotate(-90deg)';
+      }
+    }
+
+    /**
+     * =====================================================================
+     * 学習カウントダウンタイマー（Web Audio API チャイム付き）
+     * =====================================================================
+     */
+    let timerState = {
+      presetMinutes: 3,
+      presetLabel: '3分（幾何・思考リミット）',
+      totalSeconds: 180,
+      remainingSeconds: 180,
+      isRunning: false,
+      intervalId: null
+    };
+
+    function selectTimerPreset(minutes, label) {
+      pauseTimer();
+      timerState.presetMinutes = minutes;
+      timerState.presetLabel = label;
+      timerState.totalSeconds = minutes * 60;
+      timerState.remainingSeconds = minutes * 60;
+
+      document.getElementById('timer-mode-label').textContent = label;
+
+      // プリセットボタンのハイライト更新
+      [3, 30, 25].forEach(m => {
+        const btn = document.getElementById(`preset-${m}`);
+        if (m === minutes) {
+          btn.className = 'preset-btn flex flex-col items-center justify-center p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 transition-all';
+        } else {
+          btn.className = 'preset-btn flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 hover:border-indigo-400 transition-all';
+        }
+      });
+
+      updateTimerDisplay();
+    }
+
+    function quickStartGeometryTimer() {
+      selectTimerPreset(3, '3分（幾何・思考リミット）');
+      startTimer();
+      // モバイル・縦画面の場合はタイマーへスムーズスクロール
+      if (window.innerWidth < 1024) {
+        document.getElementById('timer-display').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function toggleTimer() {
+      if (timerState.isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    }
+
+    function startTimer() {
+      if (timerState.remainingSeconds <= 0) {
+        timerState.remainingSeconds = timerState.totalSeconds;
+      }
+      timerState.isRunning = true;
+      updateTimerControlsUI();
+
+      // iOS/iPadOS Safari用にユーザー操作タイミングでAudioContextを準備
+      unlockAudioContext();
+
+      timerState.intervalId = setInterval(() => {
+        timerState.remainingSeconds -= 1;
+        updateTimerDisplay();
+
+        if (timerState.remainingSeconds <= 0) {
+          completeTimer();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      timerState.isRunning = false;
+      if (timerState.intervalId) {
+        clearInterval(timerState.intervalId);
+        timerState.intervalId = null;
+      }
+      updateTimerControlsUI();
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      timerState.remainingSeconds = timerState.totalSeconds;
+      updateTimerDisplay();
+    }
+
+    function completeTimer() {
+      pauseTimer();
+      timerState.remainingSeconds = 0;
+      updateTimerDisplay();
+      playNotificationChime();
+
+      let title = `${timerState.presetMinutes}分タイマー終了！`;
+      let desc = 'お疲れさまでした！次のタスクへ進みましょう。';
+      if (timerState.presetMinutes === 3) {
+        title = '3分経過！（幾何・思考リミット）';
+        desc = '手が止まっているなら即・解説を見て「なぜその補助線か」を確認し、問題番号に×印をつけましょう！';
+      } else if (timerState.presetMinutes === 30) {
+        title = '30分経過！（毎日幾何タッチ完了）';
+        desc = '今日の幾何タッチ達成です！チェックを入れて他のメイン学習へ切り替えましょう。';
+      } else if (timerState.presetMinutes === 25) {
+        title = '25分集中完了！（ポモドーロ）';
+        desc = '5分ほど目を休めてストレッチしてから、次のセットに入りましょう。';
+      }
+      showTimerToast(title, desc);
+    }
+
+    function updateTimerDisplay() {
+      const mins = Math.floor(timerState.remainingSeconds / 60);
+      const secs = timerState.remainingSeconds % 60;
+      const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      document.getElementById('timer-display').textContent = formatted;
+
+      const ratio = timerState.totalSeconds === 0 ? 0 : (timerState.remainingSeconds / timerState.totalSeconds) * 100;
+      document.getElementById('timer-progress-bar').style.width = `${ratio}%`;
+    }
+
+    function updateTimerControlsUI() {
+      const btn = document.getElementById('timer-start-btn');
+      const text = document.getElementById('timer-start-text');
+      const pulseBg = document.getElementById('timer-pulse-bg');
+
+      if (timerState.isRunning) {
+        btn.className = 'py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2';
+        text.textContent = '一時停止';
+        pulseBg.classList.remove('hidden');
+      } else {
+        btn.className = 'py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2';
+        text.textContent = 'スタート';
+        pulseBg.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Web Audio API による優しい終了チャイム音（外部音源URL不要）
+     */
+    let audioCtx = null;
+    function unlockAudioContext() {
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      } catch (e) {
+        console.warn('Web Audio API not supported', e);
+      }
+    }
+
+    function playNotificationChime() {
+      try {
+        unlockAudioContext();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        // 心地よい3和音チャイム（C5 -> E5 -> G5 -> C6）を2回鳴らす
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        [0, 0.9].forEach(repeatOffset => {
+          notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + repeatOffset + i * 0.14);
+
+            gain.gain.setValueAtTime(0.001, now + repeatOffset + i * 0.14);
+            gain.gain.exponentialRampToValueAtTime(0.18, now + repeatOffset + i * 0.14 + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + repeatOffset + i * 0.14 + 0.55);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(now + repeatOffset + i * 0.14);
+            osc.stop(now + repeatOffset + i * 0.14 + 0.6);
+          });
+        });
+      } catch (e) {
+        console.warn('Audio playback failed:', e);
+      }
+    }
+
+    /**
+     * 画面内トースト通知の表示・非表示
+     */
+    let toastTimeout = null;
+    function showTimerToast(title, desc) {
+      const toast = document.getElementById('timer-toast');
+      document.getElementById('timer-toast-title').textContent = title;
+      document.getElementById('timer-toast-desc').textContent = desc;
+
+      toast.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        hideTimerToast();
+      }, 9000);
+    }
+
+    function hideTimerToast() {
+      const toast = document.getElementById('timer-toast');
+      toast.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+    }
+
+    /**
+     * HTMLエスケープユーティリティ
+     */
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ページ読み込み完了時に初期化実行
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
+
+```
